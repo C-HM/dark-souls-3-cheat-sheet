@@ -39,6 +39,17 @@ var profilesKey = 'darksouls3_profiles';
             addCheckbox(this);
         });
 
+        // Build wiki-URL → [checkbox id, ...] map for cross-section linking
+        var urlToIds = {};
+        $('ul li[data-id]').each(function() {
+            var id = $(this).attr('data-id');
+            $(this).find('a[href*="darksouls3.wiki"]').each(function() {
+                var href = $(this).attr('href').replace(/^https?:\/\//, '//');
+                if (!urlToIds[href]) urlToIds[href] = [];
+                if (urlToIds[href].indexOf(id) === -1) urlToIds[href].push(id);
+            });
+        });
+
         // Open external links in new tab
         $("a[href^='http']").attr('target','_blank');
 
@@ -52,6 +63,25 @@ var profilesKey = 'darksouls3_profiles';
             } else {
               $('[data-id="'+id+'"] label').removeClass('completed');
             }
+
+            // Sync all items that share a wiki link with this item
+            $('[data-id="' + id + '"]').find('a[href*="darksouls3.wiki"]').each(function() {
+                var href = $(this).attr('href').replace(/^https?:\/\//, '//');
+                if (!urlToIds[href]) return;
+                $.each(urlToIds[href], function(i, linkedId) {
+                    if (linkedId === id) return;
+                    var $linkedCheckbox = $('#' + linkedId);
+                    if ($linkedCheckbox.prop('checked') === isChecked) return;
+                    profiles[profilesKey][profiles.current].checklistData[linkedId] = isChecked;
+                    $linkedCheckbox.prop('checked', isChecked);
+                    if (isChecked) {
+                        $('[data-id="' + linkedId + '"] label').addClass('completed');
+                    } else {
+                        $('[data-id="' + linkedId + '"] label').removeClass('completed');
+                    }
+                });
+            });
+
             $.jStorage.set(profilesKey, profiles);
             calculateTotals();
         });
