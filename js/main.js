@@ -68,14 +68,22 @@ var profilesKey = 'darksouls3_profiles';
             // Playthrough items sync to dedicated sections (weapons/armors/items).
             // Dedicated section items only sync to other dedicated sections, not back to playthrough,
             // to avoid checking many unrelated playthrough steps that mention common items.
-            var isPlaythrough = /^(playthrough_|crow_)/.test(id);
+            function sectionOf(itemId) {
+                if (/^(playthrough_|crow_)/.test(itemId)) return 'playthrough';
+                if (/^weapons_/.test(itemId)) return 'weapons';
+                if (/^armors_/.test(itemId)) return 'armors';
+                return 'checklist';
+            }
+            var srcSection = sectionOf(id);
             $('[data-id="' + id + '"]').find('a[href*="darksouls3.wiki"]').each(function() {
                 var href = $(this).attr('href').replace(/^https?:\/\//, '//');
                 if (!urlToIds[href]) return;
                 $.each(urlToIds[href], function(i, linkedId) {
                     if (linkedId === id) return;
-                    var linkedIsPlaythrough = /^(playthrough_|crow_)/.test(linkedId);
-                    if (!isPlaythrough && linkedIsPlaythrough) return;
+                    // Never sync between two items in the same section
+                    if (sectionOf(linkedId) === srcSection) return;
+                    // Dedicated sections don't sync back to playthrough
+                    if (srcSection !== 'playthrough' && sectionOf(linkedId) === 'playthrough') return;
                     var $linkedCheckbox = $('#' + linkedId);
                     if ($linkedCheckbox.prop('checked') === isChecked) return;
                     profiles[profilesKey][profiles.current].checklistData[linkedId] = isChecked;
