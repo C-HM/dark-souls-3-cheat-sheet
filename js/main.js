@@ -50,6 +50,47 @@ var profilesKey = 'darksouls3_profiles';
             });
         });
 
+        // Resolve armor set URLs (e.g. "Catarina+Set") to individual armor piece IDs.
+        // Playthrough steps link to a set wiki page; the armors section lists each piece
+        // separately (e.g. "Catarina+Helm"). We match by stripping the "+Set" suffix to
+        // get a prefix, then find armor pieces whose URL starts with that prefix.
+        (function() {
+            var armorHrefToId = {};
+            $('ul li[data-id^="armors_"]').each(function() {
+                var id = $(this).attr('data-id');
+                $(this).find('a[href*="darksouls3.wiki"]').each(function() {
+                    var href = $(this).attr('href').replace(/^https?:\/\//, '//');
+                    armorHrefToId[href] = id;
+                });
+            });
+
+            // Collect set entries: URLs ending in +Set with no existing armor matches
+            var setEntries = [];
+            $.each(urlToIds, function(href, ids) {
+                if (ids.some(function(id) { return /^armors_/.test(id); })) return;
+                var page = href.split('/').pop();
+                if (!/\+Set$/.test(page)) return;
+                var prefix = page
+                    .replace(/\+Chain\+Set$/, '+Chain')  // "Mirrah+Chain+Set" → "Mirrah+Chain"
+                    .replace(/\+Armor\+Set$/, '')         // "Northern+Armor+Set" → "Northern"
+                    .replace(/\+Set$/, '');               // "Catarina+Set" → "Catarina"
+                if (prefix) setEntries.push({prefix: prefix, href: href});
+            });
+            // Longest prefix first so "Mirrah+Chain" claims its pieces before "Mirrah"
+            setEntries.sort(function(a, b) { return b.prefix.length - a.prefix.length; });
+
+            var claimed = {};
+            $.each(setEntries, function(_, entry) {
+                $.each(armorHrefToId, function(armorHref, armorId) {
+                    if (claimed[armorId]) return;
+                    var armorPage = armorHref.split('/').pop();
+                    if (armorPage !== entry.prefix && armorPage.indexOf(entry.prefix + '+') !== 0) return;
+                    if (urlToIds[entry.href].indexOf(armorId) === -1) urlToIds[entry.href].push(armorId);
+                    claimed[armorId] = true;
+                });
+            });
+        })();
+
         // Open external links in new tab
         $("a[href^='http']").attr('target','_blank');
 
@@ -65,12 +106,14 @@ var profilesKey = 'darksouls3_profiles';
             }
 
             // Sync all items that share a wiki link with this item.
-            // Playthrough items sync only to weapons/armors sections.
+            // Playthrough items sync only to weapons, armors, and spells sections.
             // Dedicated section items only sync to other dedicated sections, not back to playthrough.
             function sectionOf(itemId) {
                 if (/^(playthrough_|crow_)/.test(itemId)) return 'playthrough';
                 if (/^weapons_/.test(itemId)) return 'weapons';
                 if (/^armors_/.test(itemId)) return 'armors';
+                // Sorceries (2), Pyromancies (3), Miracles (4), DLC Spells (11)
+                if (/^checklist_(2|3|4|11)_/.test(itemId)) return 'spells';
                 return 'checklist';
             }
             var srcSection = sectionOf(id);
@@ -80,8 +123,8 @@ var profilesKey = 'darksouls3_profiles';
                 $.each(urlToIds[href], function(i, linkedId) {
                     if (linkedId === id) return;
                     var linkedSection = sectionOf(linkedId);
-                    // Playthrough only syncs to weapons and armors (not checklist or other playthrough)
-                    if (srcSection === 'playthrough' && linkedSection !== 'weapons' && linkedSection !== 'armors') return;
+                    // Playthrough only syncs to weapons, armors, and spells
+                    if (srcSection === 'playthrough' && linkedSection !== 'weapons' && linkedSection !== 'armors' && linkedSection !== 'spells') return;
                     // Dedicated sections don't sync back to playthrough
                     if (srcSection !== 'playthrough' && linkedSection === 'playthrough') return;
                     // Never sync within the same section
