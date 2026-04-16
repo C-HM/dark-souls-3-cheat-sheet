@@ -65,9 +65,8 @@ var profilesKey = 'darksouls3_profiles';
             }
 
             // Sync all items that share a wiki link with this item.
-            // Playthrough items sync to dedicated sections (weapons/armors/items).
-            // Dedicated section items only sync to other dedicated sections, not back to playthrough,
-            // to avoid checking many unrelated playthrough steps that mention common items.
+            // Playthrough items sync only to weapons/armors sections.
+            // Dedicated section items only sync to other dedicated sections, not back to playthrough.
             function sectionOf(itemId) {
                 if (/^(playthrough_|crow_)/.test(itemId)) return 'playthrough';
                 if (/^weapons_/.test(itemId)) return 'weapons';
@@ -80,10 +79,13 @@ var profilesKey = 'darksouls3_profiles';
                 if (!urlToIds[href]) return;
                 $.each(urlToIds[href], function(i, linkedId) {
                     if (linkedId === id) return;
-                    // Never sync between two items in the same section
-                    if (sectionOf(linkedId) === srcSection) return;
+                    var linkedSection = sectionOf(linkedId);
+                    // Playthrough only syncs to weapons and armors (not checklist or other playthrough)
+                    if (srcSection === 'playthrough' && linkedSection !== 'weapons' && linkedSection !== 'armors') return;
                     // Dedicated sections don't sync back to playthrough
-                    if (srcSection !== 'playthrough' && sectionOf(linkedId) === 'playthrough') return;
+                    if (srcSection !== 'playthrough' && linkedSection === 'playthrough') return;
+                    // Never sync within the same section
+                    if (linkedSection === srcSection) return;
                     var $linkedCheckbox = $('#' + linkedId);
                     if ($linkedCheckbox.prop('checked') === isChecked) return;
                     profiles[profilesKey][profiles.current].checklistData[linkedId] = isChecked;
