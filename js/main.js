@@ -64,12 +64,18 @@ var profilesKey = 'darksouls3_profiles';
               $('[data-id="'+id+'"] label').removeClass('completed');
             }
 
-            // Sync all items that share a wiki link with this item
+            // Sync all items that share a wiki link with this item.
+            // Playthrough items sync to dedicated sections (weapons/armors/items).
+            // Dedicated section items only sync to other dedicated sections, not back to playthrough,
+            // to avoid checking many unrelated playthrough steps that mention common items.
+            var isPlaythrough = /^(playthrough_|crow_)/.test(id);
             $('[data-id="' + id + '"]').find('a[href*="darksouls3.wiki"]').each(function() {
                 var href = $(this).attr('href').replace(/^https?:\/\//, '//');
                 if (!urlToIds[href]) return;
                 $.each(urlToIds[href], function(i, linkedId) {
                     if (linkedId === id) return;
+                    var linkedIsPlaythrough = /^(playthrough_|crow_)/.test(linkedId);
+                    if (!isPlaythrough && linkedIsPlaythrough) return;
                     var $linkedCheckbox = $('#' + linkedId);
                     if ($linkedCheckbox.prop('checked') === isChecked) return;
                     profiles[profilesKey][profiles.current].checklistData[linkedId] = isChecked;
